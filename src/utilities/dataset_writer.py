@@ -24,5 +24,5 @@ if __name__ == '__main__':
         if df_census_starter[column].dtype == 'int64':
             df_census_starter[column] = df_census_starter[column].astype(np.uint32)
 
-    df_census_starter.to_parquet(settings.DATA / 'census_starter.csv')
-    settings.logger.info(f'census_starter.csv is saved to {settings.DATA}')
+    df_census_starter.to_parquet(settings.DATA / 'census_starter.parquet')
+    settings.logger.info(f'census_starter.parquet is saved to {settings.DATA}')
