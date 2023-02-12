@@ -9,13 +9,13 @@ import settings
 if __name__ == '__main__':
 
     df_train = pd.read_csv(settings.DATA / 'train.csv')
-    settings.logger.info(f'Training Set Shape: {df_train.shape} Memory Usage: {df_train.memory_usage().sum() / 1024 ** 2:.2f} MB')
-
+    settings.logger.info(f'train Shape: {df_train.shape} Memory Usage: {df_train.memory_usage().sum() / 1024 ** 2:.2f} MB')
     df_test = pd.read_csv(settings.DATA / 'test.csv')
-    settings.logger.info(f'Test Set Shape: {df_test.shape} Memory Usage: {df_test.memory_usage().sum() / 1024 ** 2:.2f} MB')
+
+    settings.logger.info(f'test Shape: {df_test.shape} Memory Usage: {df_test.memory_usage().sum() / 1024 ** 2:.2f} MB')
 
     df_census_starter = pd.read_csv(settings.DATA / 'census_starter.csv')
-    settings.logger.info(f'Test Set Shape: {df_census_starter.shape} Memory Usage: {df_census_starter.memory_usage().sum() / 1024 ** 2:.2f} MB')
+    settings.logger.info(f'census_starter Shape: {df_census_starter.shape} Memory Usage: {df_census_starter.memory_usage().sum() / 1024 ** 2:.2f} MB')
 
     for df in [df_train, df_test]:
 
@@ -34,10 +34,19 @@ if __name__ == '__main__':
         if df_census_starter[column].dtype == 'int64':
             df_census_starter[column] = df_census_starter[column].astype(np.uint32)
 
-    df_train.to_parquet(settings.DATA / 'train.parquet')
+    # Restore missing county and state columns in test set
+    df_test = df_test.merge(df_train.groupby('cfips').first().reset_index()[['cfips', 'county', 'state']], on='cfips', how='right')
+
+    columns = [
+        'row_id', 'cfips', 'county', 'state',
+        'first_day_of_month', 'month', 'year',
+        'microbusiness_density', 'active'
+    ]
+
+    df_train[columns].to_parquet(settings.DATA / 'train.parquet')
     settings.logger.info(f'train.parquet is saved to {settings.DATA}')
 
-    df_test.to_parquet(settings.DATA / 'test.parquet')
+    df_test[columns[:-2]].to_parquet(settings.DATA / 'test.parquet')
     settings.logger.info(f'test.parquet is saved to {settings.DATA}')
 
     df_census_starter.to_parquet(settings.DATA / 'census_starter.parquet')
