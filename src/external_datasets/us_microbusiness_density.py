@@ -30,6 +30,32 @@ if __name__ == '__main__':
     df_test = pd.read_parquet(settings.DATA / 'test.parquet')
     settings.logger.info(f'test Shape: {df_test.shape} - Memory Usage: {df_test.memory_usage().sum() / 1024 ** 2:.2f}')
 
+    # Select columns of each year separately
+    active_2019_columns = [column for column in df_md_cities.columns if column.startswith('active') and column.endswith('19')]
+    active_2020_columns = [column for column in df_md_cities.columns if column.startswith('active') and column.endswith('20')]
+    active_2021_columns = [column for column in df_md_cities.columns if column.startswith('active') and column.endswith('21')]
+    active_2022_columns = [column for column in df_md_cities.columns if column.startswith('active') and column.endswith('22')]
+    md_2019_columns = [column for column in df_md_cities.columns if column.startswith('md') and column.endswith('19')]
+    md_2020_columns = [column for column in df_md_cities.columns if column.startswith('md') and column.endswith('20')]
+    md_2021_columns = [column for column in df_md_cities.columns if column.startswith('md') and column.endswith('21')]
+    md_2022_columns = [column for column in df_md_cities.columns if column.startswith('md') and column.endswith('22')]
+    column_groups = [
+        active_2019_columns, active_2020_columns, active_2021_columns, active_2022_columns,
+        md_2019_columns, md_2020_columns, md_2021_columns, md_2022_columns,
+    ]
+    columns_group_names = [
+        'active_2019', 'active_2020', 'active_2021', 'active_2022',
+        'md_2019', 'md_2020', 'md_2021', 'md_2022',
+    ]
+    # Aggregate microbusiness density and active on years for every dataset
+    for columns_group_name, column_group in zip(columns_group_names, column_groups):
+        for df in [df_md_cbsas, df_md_cities, df_md_counties, df_md_states]:
+            df[f'{columns_group_name}_mean'] = df[column_group].mean(axis=1)
+            df[f'{columns_group_name}_std'] = df[column_group].std(axis=1)
+            df[f'{columns_group_name}_min'] = df[column_group].min(axis=1)
+            df[f'{columns_group_name}_max'] = df[column_group].max(axis=1)
+            df[f'{columns_group_name}_sum'] = df[column_group].sum(axis=1)
+
     # Aggregate features on state groups and merge it to state data
     df_md_cities.drop(columns=['city_id', 'city'], inplace=True)
     df_md_cities_aggregations = df_md_cities.groupby('state_abbrev').agg(['mean', 'std', 'min', 'max', 'sum'])
