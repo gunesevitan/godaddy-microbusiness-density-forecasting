@@ -83,7 +83,6 @@ if __name__ == '__main__':
     df_md_cities_reindexed = df_md_cities_reindexed.merge(df_md_cities[[
         'city_id', 'state_abbrev', 'pop_18over_2020'
     ]].rename(columns={'pop_18over_2020': 'city_pop_18over_2020'}), on=['city_id'], how='left')
-    df_md_cities_reindexed['year'] = df_md_cities_reindexed['first_day_of_month'].dt.year
     df_md_cities_reindexed_state_aggregations = df_md_cities_reindexed.groupby(['first_day_of_month', 'state_abbrev']).agg({
         'active': ['mean', 'std', 'min', 'max', 'sum'],
         'md': ['mean', 'std', 'min', 'max', 'sum'],

@@ -30,6 +30,8 @@ if __name__ == '__main__':
     df_test = pd.read_parquet(settings.DATA / 'test.parquet')
     settings.logger.info(f'test Shape: {df_test.shape} - Memory Usage: {df_test.memory_usage().sum() / 1024 ** 2:.2f}')
 
+    datetime_idx = pd.date_range(start='2019-08-01', end='2022-06-01', freq='MS')
+
     # Select columns of each year separately
     orders_rank_2019_columns = [column for column in df_indcom_cities.columns if column.startswith('orders_rank') and column.endswith('19')]
     orders_rank_2020_columns = [column for column in df_indcom_cities.columns if column.startswith('orders_rank') and column.endswith('20')]
@@ -68,35 +70,156 @@ if __name__ == '__main__':
         'gmv_rank_2019', 'gmv_rank_2020', 'gmv_rank_2021', 'gmv_rank_2022',
         'avg_traffic_2019', 'avg_traffic_2020', 'avg_traffic_2021', 'avg_traffic_2022',
     ]
-    # Aggregate orders rank, merchants rank, gmv rank density and avg traffic on years for every dataset
-    for columns_group_name, column_group in zip(columns_group_names, column_groups):
-        for df in [df_indcom_cbsas, df_indcom_cities, df_indcom_counties, df_indcom_states]:
-            df[f'{columns_group_name}_mean'] = df[column_group].mean(axis=1)
-            df[f'{columns_group_name}_std'] = df[column_group].std(axis=1)
-            df[f'{columns_group_name}_min'] = df[column_group].min(axis=1)
-            df[f'{columns_group_name}_max'] = df[column_group].max(axis=1)
-            df[f'{columns_group_name}_sum'] = df[column_group].sum(axis=1)
 
-    # Aggregate features on state groups and merge it to state data
-    df_indcom_cities.drop(columns=['city_id', 'city'], inplace=True)
-    df_indcom_cities_aggregations = df_indcom_cities.groupby('state_abbrev').agg(['mean', 'std', 'min', 'max', 'sum'])
-    df_indcom_cities_aggregations.columns = 'state_' + df_indcom_cities_aggregations.columns.map('_'.join).str.strip('_')
-    df_indcom_cities_aggregations.reset_index(inplace=True)
+    # Create cartesian index from unique cities and months
+    unique_cities = df_indcom_cities['city_id'].unique().tolist()
+    cities_idx = pd.MultiIndex.from_product([unique_cities, datetime_idx], names=['city_id', 'first_day_of_month'])
+    df_indcom_cities_reindexed = pd.DataFrame(index=cities_idx).reset_index()
 
-    for column in df_indcom_cities_aggregations.columns:
-        if df_indcom_cities_aggregations[column].dtype == 'float64':
-            df_indcom_cities_aggregations[column] = df_indcom_cities_aggregations[column].astype(np.float32)
+    # Melt and merge orders_rank values to re-indexed data
+    df_indcom_cities_orders_rank = pd.melt(
+        df_indcom_cities[['city_id'] + orders_rank_2019_columns + orders_rank_2020_columns + orders_rank_2021_columns + orders_rank_2022_columns],
+        id_vars='city_id'
+    ).rename(columns={'value': 'orders_rank'})
+    df_indcom_cities_orders_rank['first_day_of_month'] = pd.to_datetime(df_indcom_cities_orders_rank['variable'].apply(lambda x: f'{x[12:-2]}-20{x[-2:]}'))
+    df_indcom_cities_reindexed = df_indcom_cities_reindexed.merge(
+        df_indcom_cities_orders_rank.drop(columns=['variable']),
+        on=['city_id', 'first_day_of_month'],
+        how='left'
+    )
+    del df_indcom_cities_orders_rank
 
-    for column in df_indcom_states.columns:
-        if df_indcom_states[column].dtype == 'float64':
-            df_indcom_states[column] = df_indcom_states[column].astype(np.float32)
+    # Melt and merge merchants_rank values to re-indexed data
+    df_indcom_cities_merchants_rank = pd.melt(
+        df_indcom_cities[['city_id'] + merchants_rank_2019_columns + merchants_rank_2020_columns + merchants_rank_2021_columns + merchants_rank_2022_columns],
+        id_vars='city_id'
+    ).rename(columns={'value': 'merchants_rank'})
+    df_indcom_cities_merchants_rank['first_day_of_month'] = pd.to_datetime(df_indcom_cities_merchants_rank['variable'].apply(lambda x: f'{x[15:-2]}-20{x[-2:]}'))
+    df_indcom_cities_reindexed = df_indcom_cities_reindexed.merge(
+        df_indcom_cities_merchants_rank.drop(columns=['variable']),
+        on=['city_id', 'first_day_of_month'],
+        how='left'
+    )
+    del df_indcom_cities_merchants_rank
 
-    df_indcom_states.columns = [f'state_{column}' for column in df_indcom_states.columns]
-    df_indcom_states.rename(columns={'state_state_abbrev': 'state_abbrev', 'state_fips': 'fips'}, inplace=True)
+    # Melt and merge gmv_rank values to re-indexed data
+    df_indcom_cities_gmv_rank = pd.melt(
+        df_indcom_cities[['city_id'] + gmv_rank_2019_columns + gmv_rank_2020_columns + gmv_rank_2021_columns + gmv_rank_2022_columns],
+        id_vars='city_id'
+    ).rename(columns={'value': 'gmv_rank'})
+    df_indcom_cities_gmv_rank['first_day_of_month'] = pd.to_datetime(df_indcom_cities_gmv_rank['variable'].apply(lambda x: f'{x[9:-2]}-20{x[-2:]}'))
+    df_indcom_cities_reindexed = df_indcom_cities_reindexed.merge(
+        df_indcom_cities_gmv_rank.drop(columns=['variable']),
+        on=['city_id', 'first_day_of_month'],
+        how='left'
+    )
+    del df_indcom_cities_gmv_rank
 
-    df_indcom_states = df_indcom_states.merge(df_indcom_cities_aggregations, on='state_abbrev', how='left')
-    df_indcom_states = df_indcom_states.drop(columns=['state_state_name', 'state_abbrev']).sort_values(by='fips', ascending=True).reset_index(drop=True)
-    df_indcom_states.to_parquet(external_processed_dataset_directory / 'state_industry_commerce.parquet')
+    # Melt and merge avg_traffic values to re-indexed data
+    df_indcom_cities_avg_traffic = pd.melt(
+        df_indcom_cities[['city_id'] + avg_traffic_2019_columns + avg_traffic_2020_columns + avg_traffic_2021_columns + avg_traffic_2022_columns],
+        id_vars='city_id'
+    ).rename(columns={'value': 'avg_traffic'})
+    df_indcom_cities_avg_traffic['first_day_of_month'] = pd.to_datetime(df_indcom_cities_avg_traffic['variable'].apply(lambda x: f'{x[12:-2]}-20{x[-2:]}'))
+    df_indcom_cities_reindexed = df_indcom_cities_reindexed.merge(
+        df_indcom_cities_avg_traffic.drop(columns=['variable']),
+        on=['city_id', 'first_day_of_month'],
+        how='left'
+    )
+    del df_indcom_cities_avg_traffic
+
+    # Merge remaining columns and create aggregations
+    df_indcom_cities_reindexed = df_indcom_cities_reindexed.merge(df_indcom_cities[[
+        'city_id', 'state_abbrev'
+    ]], on=['city_id'], how='left')
+    df_indcom_cities_reindexed_state_aggregations = df_indcom_cities_reindexed.groupby(['first_day_of_month', 'state_abbrev']).agg({
+        'orders_rank': ['mean', 'std', 'min', 'max', 'sum'],
+        'merchants_rank': ['mean', 'std', 'min', 'max', 'sum'],
+        'gmv_rank': ['mean', 'std', 'min', 'max', 'sum'],
+        'avg_traffic': ['mean', 'std', 'min', 'max', 'sum']
+    })
+    del df_indcom_cities_reindexed
+    df_indcom_cities_reindexed_state_aggregations.columns = 'state_' + df_indcom_cities_reindexed_state_aggregations.columns.map('_'.join).str.strip('_')
+    df_indcom_cities_reindexed_state_aggregations.reset_index(inplace=True)
+
+    # Create cartesian index from unique states and months
+    unique_states = df_indcom_states['state_abbrev'].unique().tolist()
+    states_idx = pd.MultiIndex.from_product([unique_states, datetime_idx], names=['state_abbrev', 'first_day_of_month'])
+    df_indcom_states_reindexed = pd.DataFrame(index=states_idx).reset_index()
+
+    # Melt and merge orders_rank values to re-indexed data
+    df_indcom_states_orders_rank = pd.melt(
+        df_indcom_states[['state_abbrev'] + orders_rank_2019_columns + orders_rank_2020_columns + orders_rank_2021_columns + orders_rank_2022_columns],
+        id_vars='state_abbrev'
+    ).rename(columns={'value': 'orders_rank'})
+    df_indcom_states_orders_rank['first_day_of_month'] = pd.to_datetime(df_indcom_states_orders_rank['variable'].apply(lambda x: f'{x[12:-2]}-20{x[-2:]}'))
+    df_indcom_states_reindexed = df_indcom_states_reindexed.merge(
+        df_indcom_states_orders_rank.drop(columns=['variable']),
+        on=['state_abbrev', 'first_day_of_month'],
+        how='left'
+    )
+    del df_indcom_states_orders_rank
+
+    # Melt and merge merchants_rank values to re-indexed data
+    df_indcom_states_merchants_rank = pd.melt(
+        df_indcom_states[['state_abbrev'] + merchants_rank_2019_columns + merchants_rank_2020_columns + merchants_rank_2021_columns + merchants_rank_2022_columns],
+        id_vars='state_abbrev'
+    ).rename(columns={'value': 'merchants_rank'})
+    df_indcom_states_merchants_rank['first_day_of_month'] = pd.to_datetime(df_indcom_states_merchants_rank['variable'].apply(lambda x: f'{x[15:-2]}-20{x[-2:]}'))
+    df_indcom_states_reindexed = df_indcom_states_reindexed.merge(
+        df_indcom_states_merchants_rank.drop(columns=['variable']),
+        on=['state_abbrev', 'first_day_of_month'],
+        how='left'
+    )
+    del df_indcom_states_merchants_rank
+
+    # Melt and merge gmv_rank values to re-indexed data
+    df_indcom_states_gmv_rank = pd.melt(
+        df_indcom_states[['state_abbrev'] + gmv_rank_2019_columns + gmv_rank_2020_columns + gmv_rank_2021_columns + gmv_rank_2022_columns],
+        id_vars='state_abbrev'
+    ).rename(columns={'value': 'gmv_rank'})
+    df_indcom_states_gmv_rank['first_day_of_month'] = pd.to_datetime(df_indcom_states_gmv_rank['variable'].apply(lambda x: f'{x[9:-2]}-20{x[-2:]}'))
+    df_indcom_states_reindexed = df_indcom_states_reindexed.merge(
+        df_indcom_states_gmv_rank.drop(columns=['variable']),
+        on=['state_abbrev', 'first_day_of_month'],
+        how='left'
+    )
+    del df_indcom_states_gmv_rank
+
+    # Melt and merge avg_traffic values to re-indexed data
+    df_indcom_states_avg_traffic = pd.melt(
+        df_indcom_states[['state_abbrev'] + avg_traffic_2019_columns + avg_traffic_2020_columns + avg_traffic_2021_columns + avg_traffic_2022_columns],
+        id_vars='state_abbrev'
+    ).rename(columns={'value': 'avg_traffic'})
+    df_indcom_states_avg_traffic['first_day_of_month'] = pd.to_datetime(df_indcom_states_avg_traffic['variable'].apply(lambda x: f'{x[12:-2]}-20{x[-2:]}'))
+    df_indcom_states_reindexed = df_indcom_states_reindexed.merge(
+        df_indcom_states_avg_traffic.drop(columns=['variable']),
+        on=['state_abbrev', 'first_day_of_month'],
+        how='left'
+    )
+    del df_indcom_states_avg_traffic
+
+    # Merge remaining columns
+    df_indcom_states_reindexed = df_indcom_states_reindexed.merge(df_indcom_states[[
+        'state_abbrev', 'fips', 'total_pop_20'
+    ]].rename(columns={'total_pop_20': 'state_total_pop_20'})).merge(
+        df_indcom_cities_reindexed_state_aggregations,
+        on=['state_abbrev', 'first_day_of_month'],
+        how='left'
+    ).drop(columns=['state_abbrev']).rename(columns={
+        'orders_rank': 'state_orders_rank',
+        'merchants_rank': 'state_merchants_rank',
+        'gmv_rank': 'state_gmv_rank',
+        'avg_traffic': 'state_avg_traffic',
+    })
+    df_indcom_states_reindexed = df_indcom_states_reindexed[sorted(df_indcom_states_reindexed.columns)]
+    del df_indcom_states
+
+    for column in df_indcom_states_reindexed.columns:
+        if df_indcom_states_reindexed[column].dtype == 'float64':
+            df_indcom_states_reindexed[column] = df_indcom_states_reindexed[column].astype(np.float32)
+
+    df_indcom_states_reindexed.to_parquet(external_processed_dataset_directory / 'state_industry_commerce.parquet')
     settings.logger.info(f'state_industry_commerce.parquet is saved to {external_processed_dataset_directory}')
 
     for column in df_indcom_counties.columns:
@@ -108,8 +231,74 @@ if __name__ == '__main__':
     df_indcom_counties = df_indcom_counties.sort_values(by='cfips', ascending=True).reset_index(drop=True)
     df_indcom_counties['cfips'] = df_indcom_counties['cfips'].astype('int')
     df_indcom_counties['total_pop_20'] = df_indcom_counties['total_pop_20'].astype('int')
-    df_indcom_counties.drop(columns=['county', 'state', 'groupflag'], inplace=True)
-    df_indcom_counties.columns = [f'county_{column}' for column in df_indcom_counties.columns]
-    df_indcom_counties.rename(columns={'county_cfips': 'cfips'}, inplace=True)
-    df_indcom_counties.to_parquet(external_processed_dataset_directory / 'county_industry_commerce.parquet')
+    df_indcom_counties.drop(columns=['county', 'state'], inplace=True)
+
+    # Create cartesian index from unique states and months
+    unique_counties = df_indcom_counties['cfips'].unique().tolist()
+    counties_idx = pd.MultiIndex.from_product([unique_counties, datetime_idx], names=['cfips', 'first_day_of_month'])
+    df_indcom_counties_reindexed = pd.DataFrame(index=counties_idx).reset_index()
+
+    # Melt and merge orders_rank values to re-indexed data
+    df_indcom_counties_orders_rank = pd.melt(
+        df_indcom_counties[['cfips'] + orders_rank_2019_columns + orders_rank_2020_columns + orders_rank_2021_columns + orders_rank_2022_columns],
+        id_vars='cfips'
+    ).rename(columns={'value': 'orders_rank'})
+    df_indcom_counties_orders_rank['first_day_of_month'] = pd.to_datetime(df_indcom_counties_orders_rank['variable'].apply(lambda x: f'{x[12:-2]}-20{x[-2:]}'))
+    df_indcom_counties_reindexed = df_indcom_counties_reindexed.merge(
+        df_indcom_counties_orders_rank.drop(columns=['variable']),
+        on=['cfips', 'first_day_of_month'],
+        how='left'
+    )
+    del df_indcom_counties_orders_rank
+
+    # Melt and merge merchants_rank values to re-indexed data
+    df_indcom_counties_merchants_rank = pd.melt(
+        df_indcom_counties[['cfips'] + merchants_rank_2019_columns + merchants_rank_2020_columns + merchants_rank_2021_columns + merchants_rank_2022_columns],
+        id_vars='cfips'
+    ).rename(columns={'value': 'merchants_rank'})
+    df_indcom_counties_merchants_rank['first_day_of_month'] = pd.to_datetime(df_indcom_counties_merchants_rank['variable'].apply(lambda x: f'{x[15:-2]}-20{x[-2:]}'))
+    df_indcom_counties_reindexed = df_indcom_counties_reindexed.merge(
+        df_indcom_counties_merchants_rank.drop(columns=['variable']),
+        on=['cfips', 'first_day_of_month'],
+        how='left'
+    )
+    del df_indcom_counties_merchants_rank
+
+    # Melt and merge gmv_rank values to re-indexed data
+    df_indcom_counties_gmv_rank = pd.melt(
+        df_indcom_counties[['cfips'] + gmv_rank_2019_columns + gmv_rank_2020_columns + gmv_rank_2021_columns + gmv_rank_2022_columns],
+        id_vars='cfips'
+    ).rename(columns={'value': 'gmv_rank'})
+    df_indcom_counties_gmv_rank['first_day_of_month'] = pd.to_datetime(df_indcom_counties_gmv_rank['variable'].apply(lambda x: f'{x[9:-2]}-20{x[-2:]}'))
+    df_indcom_counties_reindexed = df_indcom_counties_reindexed.merge(
+        df_indcom_counties_gmv_rank.drop(columns=['variable']),
+        on=['cfips', 'first_day_of_month'],
+        how='left'
+    )
+    del df_indcom_counties_gmv_rank
+
+    # Melt and merge avg_traffic values to re-indexed data
+    df_indcom_counties_avg_traffic = pd.melt(
+        df_indcom_counties[['cfips'] + avg_traffic_2019_columns + avg_traffic_2020_columns + avg_traffic_2021_columns + avg_traffic_2022_columns],
+        id_vars='cfips'
+    ).rename(columns={'value': 'avg_traffic'})
+    df_indcom_counties_avg_traffic['first_day_of_month'] = pd.to_datetime(df_indcom_counties_avg_traffic['variable'].apply(lambda x: f'{x[12:-2]}-20{x[-2:]}'))
+    df_indcom_counties_reindexed = df_indcom_counties_reindexed.merge(
+        df_indcom_counties_avg_traffic.drop(columns=['variable']),
+        on=['cfips', 'first_day_of_month'],
+        how='left'
+    )
+    del df_indcom_counties_avg_traffic
+
+    df_indcom_counties_reindexed = df_indcom_counties_reindexed.merge(df_indcom_counties[[
+        'cfips', 'total_pop_20'
+    ]].rename(columns={'total_pop_20': 'county_total_pop_20'}))
+    df_indcom_counties_reindexed.rename(columns={
+        'orders_rank': 'county_orders_rank',
+        'merchants_rank': 'county_merchants_rank',
+        'gmv_rank': 'county_gmv_rank',
+        'avg_traffic': 'county_avg_traffic',
+    }, inplace=True)
+
+    df_indcom_counties_reindexed.to_parquet(external_processed_dataset_directory / 'county_industry_commerce.parquet')
     settings.logger.info(f'county_industry_commerce.parquet is saved to {external_processed_dataset_directory}')
