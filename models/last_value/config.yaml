@@ -12,3 +12,4 @@ training:
 persistence:
   visualize_scores: True
   visualize_val_predictions: False
+  visualize_test_predictions: False
