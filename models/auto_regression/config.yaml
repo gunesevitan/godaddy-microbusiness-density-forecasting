@@ -1,0 +1,25 @@
+dataset:
+  train: train.parquet
+  test: test.parquet
+
+training:
+  target: microbusiness_density
+  folds: [
+    fold1, fold2, fold3, fold4,
+    fold5, fold6, fold7, fold8
+  ]
+
+model:
+  model_class: ARIMA
+  model_parameters:
+    order: [1, 1, 1]
+    seasonal_order: [0, 0, 0, 0]
+    trend: n
+    enforce_stationarity: True
+    enforce_invertibility: True
+    concentrate_scale: True
+
+persistence:
+  visualize_scores: True
+  visualize_val_predictions: False
+  visualize_test_predictions: True
