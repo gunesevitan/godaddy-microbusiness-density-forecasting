@@ -156,10 +156,10 @@ if __name__ == '__main__':
 
             settings.logger.info('Finished visualizing test set predictions')
 
-        df_test = df.groupby('cfips').tail(6)
-        df_test['microbusiness_density'] = df_test['predictions'].values
-        df_test[['row_id', 'microbusiness_density']].to_csv(submission_directory / 'auto_regression_prediction.csv', index=False)
-        settings.logger.info(f'Saved auto_regression_prediction.csv to {submission_directory}')
+        df_test = df.groupby('cfips').tail(6).reset_index(drop=True)
+        df_test['microbusiness_density'] = df_test['predictions']
+        df_test[['row_id', 'microbusiness_density']].to_csv(submission_directory / 'auto_regression_submission.csv', index=False)
+        settings.logger.info(f'Saved auto_regression_submission.csv to {submission_directory}')
 
     else:
         raise ValueError(f'Invalid mode {args.mode}')
