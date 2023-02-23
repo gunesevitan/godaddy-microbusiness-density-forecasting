@@ -1,0 +1,20 @@
+dataset:
+  train: train.parquet
+  test: test.parquet
+
+training:
+  features: [
+    cfips_cumcount,
+    microbusiness_density_shift_5,
+    #microbusiness_density_shift_5_rolling_std_3,
+    #microbusiness_density_shift_5_rolling_min_3, microbusiness_density_shift_5_rolling_max_3
+  ]
+  target: microbusiness_density
+  folds: [
+    fold1, fold2, fold3, fold4,
+    fold5, fold6, fold7, fold8
+  ]
+
+persistence:
+  visualize_scores: True
+  visualize_val_predictions: False
