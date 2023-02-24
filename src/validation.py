@@ -45,6 +45,7 @@ if __name__ == '__main__':
     df_train = create_validation_splits(
         df=df_train,
         validation_folds={
+            # Folds for validating on most frequent year
             'fold1': {
                 'train': {
                     'start': '2019-08-01 00:00:00',
@@ -123,6 +124,37 @@ if __name__ == '__main__':
                 'val': {
                     'start': '2022-10-01 00:00:00',
                     'end': '2023-01-01 00:00:00'
+                }
+            },
+            # Folds for validating new year transitions
+            'fold9': {
+                'train': {
+                    'start': '2019-08-01 00:00:00',
+                    'end': '2020-01-01 00:00:00'
+                },
+                'val': {
+                    'start': '2020-01-01 00:00:00',
+                    'end': '2020-02-01 00:00:00'
+                }
+            },
+            'fold10': {
+                'train': {
+                    'start': '2019-08-01 00:00:00',
+                    'end': '2021-01-01 00:00:00'
+                },
+                'val': {
+                    'start': '2021-01-01 00:00:00',
+                    'end': '2021-02-01 00:00:00'
+                }
+            },
+            'fold11': {
+                'train': {
+                    'start': '2019-08-01 00:00:00',
+                    'end': '2022-01-01 00:00:00'
+                },
+                'val': {
+                    'start': '2022-01-01 00:00:00',
+                    'end': '2022-02-01 00:00:00'
                 }
             },
         }
