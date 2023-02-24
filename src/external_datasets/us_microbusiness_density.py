@@ -9,20 +9,20 @@ import settings
 
 if __name__ == '__main__':
 
-    external_raw_dataset_directory = pathlib.Path(settings.DATA / 'external' / 'raw' / 'VF_md_bundle_Q222')
+    external_raw_dataset_directory = pathlib.Path(settings.DATA / 'external' / 'raw' / 'VF_md_bundle_Q422')
     external_processed_dataset_directory = pathlib.Path(settings.DATA / 'external' / 'processed')
 
-    df_md_cbsas = pd.read_csv(external_raw_dataset_directory / 'VF_md_cbsas_Q222.csv')
-    settings.logger.info(f'VF_md_cbsas_Q222 Shape: {df_md_cbsas.shape} - Memory Usage: {df_md_cbsas.memory_usage().sum() / 1024 ** 2:.2f}')
+    df_md_cbsas = pd.read_csv(external_raw_dataset_directory / 'VF_md_cbsas_Q422.csv')
+    settings.logger.info(f'VF_md_cbsas_Q422 Shape: {df_md_cbsas.shape} - Memory Usage: {df_md_cbsas.memory_usage().sum() / 1024 ** 2:.2f}')
 
-    df_md_cities = pd.read_csv(external_raw_dataset_directory / 'VF_md_cities_Q222.csv')
-    settings.logger.info(f'VF_md_cities_Q222 Shape: {df_md_cities.shape} - Memory Usage: {df_md_cities.memory_usage().sum() / 1024 ** 2:.2f}')
+    df_md_cities = pd.read_csv(external_raw_dataset_directory / 'VF_md_cities_Q422.csv')
+    settings.logger.info(f'VF_md_cities_Q422 Shape: {df_md_cities.shape} - Memory Usage: {df_md_cities.memory_usage().sum() / 1024 ** 2:.2f}')
 
-    df_md_counties = pd.read_csv(external_raw_dataset_directory / 'VF_md_counties_Q222.csv')
-    settings.logger.info(f'VF_md_counties_Q222 Shape: {df_md_counties.shape} - Memory Usage: {df_md_counties.memory_usage().sum() / 1024 ** 2:.2f}')
+    df_md_counties = pd.read_csv(external_raw_dataset_directory / 'VF_md_counties_Q422.csv')
+    settings.logger.info(f'VF_md_counties_Q422 Shape: {df_md_counties.shape} - Memory Usage: {df_md_counties.memory_usage().sum() / 1024 ** 2:.2f}')
 
-    df_md_states = pd.read_csv(external_raw_dataset_directory / 'VF_md_states_Q222.csv')
-    settings.logger.info(f'VF_md_states_Q222 Shape: {df_md_states.shape} - Memory Usage: {df_md_states.memory_usage().sum() / 1024 ** 2:.2f}')
+    df_md_states = pd.read_csv(external_raw_dataset_directory / 'VF_md_states_Q422.csv')
+    settings.logger.info(f'VF_md_states_Q422 Shape: {df_md_states.shape} - Memory Usage: {df_md_states.memory_usage().sum() / 1024 ** 2:.2f}')
 
     df_train = pd.read_parquet(settings.DATA / 'train.parquet')
     settings.logger.info(f'train Shape: {df_train.shape} - Memory Usage: {df_train.memory_usage().sum() / 1024 ** 2:.2f}')
@@ -30,7 +30,7 @@ if __name__ == '__main__':
     df_test = pd.read_parquet(settings.DATA / 'test.parquet')
     settings.logger.info(f'test Shape: {df_test.shape} - Memory Usage: {df_test.memory_usage().sum() / 1024 ** 2:.2f}')
 
-    datetime_idx = pd.date_range(start='2019-08-01', end='2022-06-01', freq='MS')
+    datetime_idx = pd.date_range(start='2019-08-01', end='2022-12-01', freq='MS')
 
     # Select columns of each year separately
     active_2019_columns = [column for column in df_md_cities.columns if column.startswith('active') and column.endswith('19')]
@@ -59,7 +59,7 @@ if __name__ == '__main__':
     df_md_cities_active = pd.melt(df_md_cities[
         ['city_id'] + active_2019_columns + active_2020_columns + active_2021_columns + active_2022_columns
     ], id_vars='city_id').rename(columns={'value': 'active'})
-    df_md_cities_active['first_day_of_month'] = pd.to_datetime(df_md_cities_active['variable'].apply(lambda x: f'{x[6:-2]}-20{x[-2:]}'))
+    df_md_cities_active['first_day_of_month'] = pd.to_datetime(df_md_cities_active['variable'].apply(lambda x: f'{x[7:-2]}-20{x[-2:]}'))
     df_md_cities_reindexed = df_md_cities_reindexed.merge(
         df_md_cities_active.drop(columns=['variable']),
         on=['city_id', 'first_day_of_month'],
@@ -71,7 +71,7 @@ if __name__ == '__main__':
     df_md_cities_md = pd.melt(df_md_cities[
         ['city_id'] + md_2019_columns + md_2020_columns + md_2021_columns + md_2022_columns
     ], id_vars='city_id').rename(columns={'value': 'md'})
-    df_md_cities_md['first_day_of_month'] = pd.to_datetime(df_md_cities_md['variable'].apply(lambda x: f'{x[2:-2]}-20{x[-2:]}'))
+    df_md_cities_md['first_day_of_month'] = pd.to_datetime(df_md_cities_md['variable'].apply(lambda x: f'{x[3:-2]}-20{x[-2:]}'))
     df_md_cities_reindexed = df_md_cities_reindexed.merge(
         df_md_cities_md.drop(columns=['variable']),
         on=['city_id', 'first_day_of_month'],
@@ -98,9 +98,9 @@ if __name__ == '__main__':
 
     # Melt and merge active values to re-indexed data
     df_md_states_active = pd.melt(df_md_states[
-        ['state_abbrev'] + active_2019_columns + active_2020_columns + active_2021_columns + active_2022_columns
+        ['state_abbrev'] + active_2019_columns + active_2020_columns + active_2021_columns + active_2022_columns[:-3]
     ], id_vars='state_abbrev').rename(columns={'value': 'active'})
-    df_md_states_active['first_day_of_month'] = pd.to_datetime(df_md_states_active['variable'].apply(lambda x: f'{x[6:-2]}-20{x[-2:]}'))
+    df_md_states_active['first_day_of_month'] = pd.to_datetime(df_md_states_active['variable'].apply(lambda x: f'{x[7:-2]}-20{x[-2:]}'))
     df_md_states_reindexed = df_md_states_reindexed.merge(
         df_md_states_active.drop(columns=['variable']),
         on=['state_abbrev', 'first_day_of_month'],
@@ -110,26 +110,15 @@ if __name__ == '__main__':
 
     # Melt and merge md values to re-indexed data
     df_md_states_md = pd.melt(df_md_states[
-        ['state_abbrev'] + md_2019_columns + md_2020_columns + md_2021_columns + md_2022_columns
+        ['state_abbrev'] + md_2019_columns + md_2020_columns + md_2021_columns + md_2022_columns[:-3]
     ], id_vars='state_abbrev').rename(columns={'value': 'md'})
-    df_md_states_md['first_day_of_month'] = pd.to_datetime(df_md_states_md['variable'].apply(lambda x: f'{x[2:-2]}-20{x[-2:]}'))
+    df_md_states_md['first_day_of_month'] = pd.to_datetime(df_md_states_md['variable'].apply(lambda x: f'{x[3:-2]}-20{x[-2:]}'))
     df_md_states_reindexed = df_md_states_reindexed.merge(
         df_md_states_md.drop(columns=['variable']),
         on=['state_abbrev', 'first_day_of_month'],
         how='left'
     )
     del df_md_states_md
-
-    # Merge remaining columns
-    df_md_states_reindexed = df_md_states_reindexed.merge(df_md_states[[
-        'state_abbrev', 'fips', 'total_pop_20'
-    ]].rename(columns={'total_pop_20': 'state_total_pop_20'})).merge(
-        df_md_cities_reindexed_state_aggregations,
-        on=['state_abbrev', 'first_day_of_month'],
-        how='left'
-    ).drop(columns=['state_abbrev']).rename(columns={'active': 'state_active', 'md': 'state_md'})
-    df_md_states_reindexed = df_md_states_reindexed[sorted(df_md_states_reindexed.columns)]
-    del df_md_states
 
     for column in df_md_states_reindexed.columns:
         if df_md_states_reindexed[column].dtype == 'float64':
@@ -146,7 +135,6 @@ if __name__ == '__main__':
     df_md_counties = df_md_counties.loc[df_md_counties['cfips'].isin(df_train['cfips'].unique())]
     df_md_counties = df_md_counties.sort_values(by='cfips', ascending=True).reset_index(drop=True)
     df_md_counties['cfips'] = df_md_counties['cfips'].astype('int')
-    df_md_counties['total_pop_20'] = df_md_counties['total_pop_20'].astype('int')
     df_md_counties.drop(columns=['county', 'state'], inplace=True)
 
     # Create cartesian index from unique states and months
@@ -158,7 +146,7 @@ if __name__ == '__main__':
     df_md_counties_active = pd.melt(df_md_counties[
         ['cfips'] + active_2019_columns + active_2020_columns + active_2021_columns + active_2022_columns
     ], id_vars='cfips').rename(columns={'value': 'active'})
-    df_md_counties_active['first_day_of_month'] = pd.to_datetime(df_md_counties_active['variable'].apply(lambda x: f'{x[6:-2]}-20{x[-2:]}'))
+    df_md_counties_active['first_day_of_month'] = pd.to_datetime(df_md_counties_active['variable'].apply(lambda x: f'{x[7:-2]}-20{x[-2:]}'))
     df_md_counties_reindexed = df_md_counties_reindexed.merge(
         df_md_counties_active.drop(columns=['variable']),
         on=['cfips', 'first_day_of_month'],
@@ -170,7 +158,7 @@ if __name__ == '__main__':
     df_md_counties_md = pd.melt(df_md_counties[
         ['cfips'] + md_2019_columns + md_2020_columns + md_2021_columns + md_2022_columns
     ], id_vars='cfips').rename(columns={'value': 'md'})
-    df_md_counties_md['first_day_of_month'] = pd.to_datetime(df_md_counties_md['variable'].apply(lambda x: f'{x[2:-2]}-20{x[-2:]}'))
+    df_md_counties_md['first_day_of_month'] = pd.to_datetime(df_md_counties_md['variable'].apply(lambda x: f'{x[3:-2]}-20{x[-2:]}'))
     df_md_counties_reindexed = df_md_counties_reindexed.merge(
         df_md_counties_md.drop(columns=['variable']),
         on=['cfips', 'first_day_of_month'],
@@ -178,9 +166,6 @@ if __name__ == '__main__':
     )
     del df_md_counties_md
 
-    df_md_counties_reindexed = df_md_counties_reindexed.merge(df_md_counties[[
-        'cfips', 'total_pop_20'
-    ]].rename(columns={'total_pop_20': 'county_total_pop_20'}))
     df_md_counties_reindexed.rename(columns={'active': 'county_active', 'md': 'county_md'}, inplace=True)
 
     df_md_counties_reindexed.to_parquet(external_processed_dataset_directory / 'county_microbusiness_densities.parquet')
