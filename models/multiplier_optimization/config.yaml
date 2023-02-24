@@ -1,0 +1,24 @@
+dataset:
+  train: train.parquet
+  test: test.parquet
+
+training:
+  target: microbusiness_density
+  folds: [
+    fold1, fold2, fold3, fold4,
+    fold5, fold6, fold7, fold8
+  ]
+
+optimization:
+  lower_bound: 1
+  upper_bound: 1.01
+  n_calls: 50
+  n_initial_points: 20
+  acq_func: gp_hedge
+  acq_optimizer: lbfgs
+  random_state: 42
+  n_jobs: -1
+
+persistence:
+  visualize_convergence: True
+  visualize_test_predictions: False
