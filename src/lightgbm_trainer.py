@@ -13,6 +13,40 @@ import feature_engineering
 import visualization
 
 
+
+def smape_eval_lgb(y_pred, train_dataset):
+
+    """
+    Calculate SMAPE metric score while training a LightGBM model
+
+    Parameters
+    ----------
+    y_pred: array-like of shape (n_samples)
+        Predictions arrays
+
+    train_dataset: lightgbm.Dataset
+        Training dataset
+
+    Returns
+    -------
+    eval_name: str
+        Name of the evaluation metric
+
+    eval_result: float
+        Result of the evaluation metric
+
+    is_higher_better: bool
+        Whether higher is better or worse for the evaluation metric
+    """
+
+    eval_name = 'smape'
+    y_true = train_dataset.get_label()
+    eval_result = metrics.symmetric_mean_absolute_percentage_error(y_true, y_pred)
+    is_higher_better = False
+
+    return eval_name, eval_result, is_higher_better
+
+
 if __name__ == '__main__':
 
     parser = argparse.ArgumentParser()
@@ -80,7 +114,8 @@ if __name__ == '__main__':
                 callbacks=[
                     lgb.early_stopping(config['fit']['early_stopping']),
                     lgb.log_evaluation(config['fit']['log_evaluation'])
-                ]
+                ],
+                feval=[smape_eval_lgb]
             )
             # Save trained model
             if config['persistence']['save_models']:
@@ -121,8 +156,6 @@ if __name__ == '__main__':
                         predictions=f'{fold}_predictions',
                         path=val_predictions_visualizations_directory / f'{cfips}_{fold}.png'
                     )
-                    if cfips == 1019:
-                        break
 
         settings.logger.info('Running LightGBM model for evaluation')
 
@@ -156,7 +189,6 @@ if __name__ == '__main__':
                     path=model_directory / f'feature_importance_{importance_type}.png'
                 )
                 settings.logger.info(f'Saved feature_importance_{importance_type}.png to {model_directory}')
-
 
     elif args.mode == 'submission':
 
