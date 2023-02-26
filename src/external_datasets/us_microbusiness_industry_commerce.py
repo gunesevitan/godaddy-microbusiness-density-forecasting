@@ -9,20 +9,20 @@ import settings
 
 if __name__ == '__main__':
 
-    external_raw_dataset_directory = pathlib.Path(settings.DATA / 'external' / 'raw' / 'VF_indcom_bundle_Q222')
+    external_raw_dataset_directory = pathlib.Path(settings.DATA / 'external' / 'raw' / 'VF_indcom_bundle_Q422')
     external_processed_dataset_directory = pathlib.Path(settings.DATA / 'external' / 'processed')
 
-    df_indcom_cbsas = pd.read_csv(external_raw_dataset_directory / 'VF_indcom_cbsa_Q222.csv')
-    settings.logger.info(f'VF_indcom_cbsas_Q222 Shape: {df_indcom_cbsas.shape} - Memory Usage: {df_indcom_cbsas.memory_usage().sum() / 1024 ** 2:.2f}')
+    df_indcom_cbsas = pd.read_csv(external_raw_dataset_directory / 'VF_indcom_cbsa_Q422.csv')
+    settings.logger.info(f'VF_indcom_cbsas_Q422 Shape: {df_indcom_cbsas.shape} - Memory Usage: {df_indcom_cbsas.memory_usage().sum() / 1024 ** 2:.2f}')
 
-    df_indcom_cities = pd.read_csv(external_raw_dataset_directory / 'VF_indcom_cities_Q222.csv')
-    settings.logger.info(f'VF_indcom_cities_Q222 Shape: {df_indcom_cities.shape} - Memory Usage: {df_indcom_cities.memory_usage().sum() / 1024 ** 2:.2f}')
+    df_indcom_cities = pd.read_csv(external_raw_dataset_directory / 'VF_indcom_cities_Q422.csv')
+    settings.logger.info(f'VF_indcom_cities_Q422 Shape: {df_indcom_cities.shape} - Memory Usage: {df_indcom_cities.memory_usage().sum() / 1024 ** 2:.2f}')
 
-    df_indcom_counties = pd.read_csv(external_raw_dataset_directory / 'VF_indcom_counties_Q222.csv')
-    settings.logger.info(f'VF_indcom_counties_Q222 Shape: {df_indcom_counties.shape} - Memory Usage: {df_indcom_counties.memory_usage().sum() / 1024 ** 2:.2f}')
+    df_indcom_counties = pd.read_csv(external_raw_dataset_directory / 'VF_indcom_cfips_Q422.csv')
+    settings.logger.info(f'VF_indcom_cfips_Q422 Shape: {df_indcom_counties.shape} - Memory Usage: {df_indcom_counties.memory_usage().sum() / 1024 ** 2:.2f}')
 
-    df_indcom_states = pd.read_csv(external_raw_dataset_directory / 'VF_indcom_states_Q222.csv')
-    settings.logger.info(f'VF_indcom_states_Q222 Shape: {df_indcom_states.shape} - Memory Usage: {df_indcom_states.memory_usage().sum() / 1024 ** 2:.2f}')
+    df_indcom_states = pd.read_csv(external_raw_dataset_directory / 'VF_indcom_states_Q422.csv')
+    settings.logger.info(f'VF_indcom_states_Q422 Shape: {df_indcom_states.shape} - Memory Usage: {df_indcom_states.memory_usage().sum() / 1024 ** 2:.2f}')
 
     df_train = pd.read_parquet(settings.DATA / 'train.parquet')
     settings.logger.info(f'train Shape: {df_train.shape} - Memory Usage: {df_train.memory_usage().sum() / 1024 ** 2:.2f}')
@@ -30,7 +30,7 @@ if __name__ == '__main__':
     df_test = pd.read_parquet(settings.DATA / 'test.parquet')
     settings.logger.info(f'test Shape: {df_test.shape} - Memory Usage: {df_test.memory_usage().sum() / 1024 ** 2:.2f}')
 
-    datetime_idx = pd.date_range(start='2019-08-01', end='2022-06-01', freq='MS')
+    datetime_idx = pd.date_range(start='2019-08-01', end='2022-12-01', freq='MS')
 
     # Select columns of each year separately
     orders_rank_2019_columns = [column for column in df_indcom_cities.columns if column.startswith('orders_rank') and column.endswith('19')]
@@ -277,19 +277,6 @@ if __name__ == '__main__':
     )
     del df_indcom_counties_gmv_rank
 
-    # Melt and merge avg_traffic values to re-indexed data
-    df_indcom_counties_avg_traffic = pd.melt(
-        df_indcom_counties[['cfips'] + avg_traffic_2019_columns + avg_traffic_2020_columns + avg_traffic_2021_columns + avg_traffic_2022_columns],
-        id_vars='cfips'
-    ).rename(columns={'value': 'avg_traffic'})
-    df_indcom_counties_avg_traffic['first_day_of_month'] = pd.to_datetime(df_indcom_counties_avg_traffic['variable'].apply(lambda x: f'{x[12:-2]}-20{x[-2:]}'))
-    df_indcom_counties_reindexed = df_indcom_counties_reindexed.merge(
-        df_indcom_counties_avg_traffic.drop(columns=['variable']),
-        on=['cfips', 'first_day_of_month'],
-        how='left'
-    )
-    del df_indcom_counties_avg_traffic
-
     df_indcom_counties_reindexed = df_indcom_counties_reindexed.merge(df_indcom_counties[[
         'cfips', 'total_pop_20'
     ]].rename(columns={'total_pop_20': 'county_total_pop_20'}))
@@ -297,7 +284,6 @@ if __name__ == '__main__':
         'orders_rank': 'county_orders_rank',
         'merchants_rank': 'county_merchants_rank',
         'gmv_rank': 'county_gmv_rank',
-        'avg_traffic': 'county_avg_traffic',
     }, inplace=True)
 
     df_indcom_counties_reindexed.to_parquet(external_processed_dataset_directory / 'county_industry_commerce.parquet')
