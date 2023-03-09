@@ -8,7 +8,7 @@ import settings
 import metrics
 
 
-def visualize_timeseries_target(df, datetime, target, cfips, start, end, predictions=None, path=None):
+def visualize_timeseries_target(df, datetime, target, name, start, end, predictions=None, score=False, path=None):
 
     """
     Visualize time series target on specified period
@@ -24,7 +24,7 @@ def visualize_timeseries_target(df, datetime, target, cfips, start, end, predict
     target: str
         Name of the target column
 
-    cfips: str
+    name: str
         Group name for the title
 
     start: str
@@ -36,6 +36,9 @@ def visualize_timeseries_target(df, datetime, target, cfips, start, end, predict
     predictions: str
         Name of the predictions column
 
+    score: bool
+        Whether to calculate predictions scores or not
+
     path: path-like str or None
         Path of the output file or None (if path is None, plot is displayed with selected backend)
     """
@@ -43,22 +46,33 @@ def visualize_timeseries_target(df, datetime, target, cfips, start, end, predict
     date_idx = (df[datetime] >= start) & (df[datetime] < end)
 
     fig, ax = plt.subplots(figsize=(24, 6), dpi=100)
-    ax.plot(df.loc[date_idx].set_index(datetime)[target], '-o', linewidth=2, label=target)
+    ax.plot(df.loc[date_idx].set_index(datetime)[target], '-o', linewidth=2)
+    ax_population = ax.twinx()
+    ax_population.plot(df.loc[date_idx].set_index(datetime)['S0101_C01_026E'], linewidth=1, alpha=0.5)
+    ax.axvline(pd.to_datetime('2022-01-01 00:00:00'), color='r')
+    ax.axvline(pd.to_datetime('2021-01-01 00:00:00'), color='r')
+    ax.axvline(pd.to_datetime('2020-01-01 00:00:00'), color='r')
 
     if predictions is not None:
-        val_idx = df[predictions].notna()
-        prediction_scores = metrics.regression_scores(y_true=df.loc[(date_idx & val_idx), target], y_pred=df.loc[(date_idx & val_idx), predictions])
-        ax.plot(
-            df.loc[date_idx].set_index(datetime)[predictions].dropna(),
-            '-o',
-            linewidth=2,
-            label=f'{predictions} - SMAPE: {prediction_scores["mean_absolute_error"]:.4f}'
-        )
-        ax.legend(prop={'size': 18})
+        for prediction in predictions:
+            if score:
+                val_idx = df[prediction].notna()
+                prediction_scores = metrics.regression_scores(y_true=df.loc[(date_idx & val_idx), target], y_pred=df.loc[(date_idx & val_idx), prediction])
+                label = f'{prediction} - SMAPE: {prediction_scores["mean_absolute_error"]:.4f}'
+            else:
+                label = prediction
+
+            ax.plot(
+                df.loc[date_idx].set_index(datetime)[prediction].dropna(),
+                '-o',
+                linewidth=2,
+                label=label
+            )
+            ax.legend(prop={'size': 18})
 
     ax.tick_params(axis='x', labelsize=12.5, pad=10)
     ax.tick_params(axis='y', labelsize=12.5, pad=10)
-    ax.set_title(f'{cfips} [{start}, {end}) - {target}', size=20, pad=15)
+    ax.set_title(f'{name} [{start}, {end}) - {target}', size=20, pad=15)
 
     if path is None:
         plt.show()
@@ -284,7 +298,7 @@ if __name__ == '__main__':
                 df=df_cfips_group,
                 datetime='first_day_of_month',
                 target='microbusiness_density',
-                cfips=cfips,
+                name=cfips,
                 start=df_cfips_group['first_day_of_month'].min(),
                 end=df_cfips_group['first_day_of_month'].max(),
                 path=time_series_target_visualization_directory / f'{cfips}.png'
